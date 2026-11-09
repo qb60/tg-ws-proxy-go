@@ -337,6 +337,25 @@ CF_PROXY=1 CF_PROXY_FIRST=1 CF_DOMAIN=yourdomain.com tgm start
 Если `--cf-domain` не указан, бинарь использует built-in пул доменов.
 `--cf-domain` сам по себе не включает Cloudflare route. Нужен `--cf-proxy`.
 
+## Firewall Mark (Linux / OpenWrt)
+
+`--fwmark` задаёт метку исходящим TCP-соединениям прокси, включая WebSocket,
+прямые подключения и fallback. UDP и DNS-запросы самого прокси не маркируются.
+
+Принимает десятичное или шестнадцатеричное значение с префиксом `0x`.
+По умолчанию `0` — маркировка отключена.
+
+```bash
+./tg-ws-proxy --fwmark 0x100
+FW_MARK=0x100 tgm start
+```
+
+В меню: `Advanced` → `22) Firewall mark`. Настройка сохраняется для последующих
+запусков и автозапуска; изменения применяются после перезапуска прокси.
+
+Для установки метки нужны права `CAP_NET_ADMIN` либо `CAP_NET_RAW` на Linux 5.17
+и новее. Если установить метку не удалось, соединение не открывается.
+
 ## MTProto Proxy
 
 MTProto mode позволяет подключать Telegram напрямую как к MTProto-прокси, без

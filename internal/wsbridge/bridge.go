@@ -18,6 +18,7 @@ import (
 
 	"tg-ws-proxy/internal/config"
 	"tg-ws-proxy/internal/mtproto"
+	"tg-ws-proxy/internal/sockopts"
 )
 
 const (
@@ -70,7 +71,7 @@ func NewClient(conn net.Conn) *Client {
 
 func DialEndpoint(ctx context.Context, cfg config.Config, ep WSEndpoint) (*Client, error) {
 	addr := net.JoinHostPort(ep.DialHost, "443")
-	dialer := &net.Dialer{Timeout: cfg.DialTimeout}
+	dialer := &net.Dialer{Timeout: cfg.DialTimeout, Control: sockopts.MarkControl(cfg.FWMark)}
 	rawConn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err

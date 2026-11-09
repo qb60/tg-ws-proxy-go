@@ -26,6 +26,7 @@ type UpstreamProxy struct {
 type Config struct {
 	Host            string
 	Port            int
+	FWMark          uint32
 	PprofAddr       string
 	Username        string
 	Password        string
@@ -73,6 +74,19 @@ func Default() Config {
 			4: telegram.IPv4DC2,
 		},
 	}
+}
+
+func ParseFWMark(value string) (uint32, error) {
+	base := 10
+	if strings.HasPrefix(value, "0x") || strings.HasPrefix(value, "0X") {
+		value = value[2:]
+		base = 16
+	}
+	mark, err := strconv.ParseUint(value, base, 32)
+	if err != nil {
+		return 0, fmt.Errorf("expected a decimal or hexadecimal uint32: %w", err)
+	}
+	return uint32(mark), nil
 }
 
 func BuiltinCFDomains() []string {

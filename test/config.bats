@@ -11,6 +11,19 @@ teardown() {
   rm -rf "$tmpdir"
 }
 
+@test "fw_mark_valid accepts uint32 decimal and hex and rejects unsafe input" {
+  run sh -c '
+    . ./lib/config.sh
+    for mark in 0 256 010 0x100 0XFF 4294967295 0xffffffff; do
+      fw_mark_valid "$mark" || exit 1
+    done
+    for mark in "" -1 +1 4294967296 0x100000000 0x 0xgg 1_000 " 1" "1;id" "1'\''" "\x31"; do
+      if fw_mark_valid "$mark"; then exit 1; fi
+    done
+  '
+  [ "$status" -eq 0 ]
+}
+
 @test "read_config_value returns key value from config file" {
   # записываем простой конфиг
   printf "FOO='bar'\n" > "$PERSIST_CONFIG_FILE"

@@ -13,6 +13,7 @@ import (
 
 	"tg-ws-proxy/internal/cfbalance"
 	"tg-ws-proxy/internal/config"
+	"tg-ws-proxy/internal/sockopts"
 	"tg-ws-proxy/internal/telegram"
 	"tg-ws-proxy/internal/wsbridge"
 )
@@ -339,7 +340,7 @@ func (s *Server) proxyTCPWithInit(ctx context.Context, conn net.Conn, host strin
 }
 
 func (s *Server) dialTCP(ctx context.Context, host string, port int) (net.Conn, error) {
-	dialer := &net.Dialer{Timeout: s.cfg.DialTimeout}
+	dialer := &net.Dialer{Timeout: s.cfg.DialTimeout, Control: sockopts.MarkControl(s.cfg.FWMark)}
 	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return nil, err

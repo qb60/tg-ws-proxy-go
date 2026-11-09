@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"tg-ws-proxy/internal/config"
+	"tg-ws-proxy/internal/sockopts"
 )
 
 const telegramTCPPort = 443
@@ -46,7 +47,7 @@ func (s *MTServer) dialTCPFallback(ctx context.Context, targetIP string, relayIn
 	dialCtx, cancel := context.WithTimeout(ctx, s.cfg.DialTimeout)
 	defer cancel()
 
-	tcpConn, err := (&net.Dialer{}).DialContext(dialCtx, "tcp", addr)
+	tcpConn, err := (&net.Dialer{Control: sockopts.MarkControl(s.cfg.FWMark)}).DialContext(dialCtx, "tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("tcp fallback dial %s: %w", addr, err)
 	}

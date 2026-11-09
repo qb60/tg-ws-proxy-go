@@ -155,6 +155,7 @@ show_telegram_settings() {
         printf "  dc map   : <default>\n"
     fi
     printf "  pool size: %s\n" "$POOL_SIZE"
+    printf "  fwmark   : %s (outbound TCP)\n" "${FW_MARK:-0}"
     if [ "$CF_PROXY" = "1" ]; then
         printf "  cf proxy : on\n"
     else
