@@ -14,6 +14,7 @@ import (
 	"tg-ws-proxy/internal/config"
 	"tg-ws-proxy/internal/faketls"
 	"tg-ws-proxy/internal/mtproto"
+	"tg-ws-proxy/internal/sockopts"
 	"tg-ws-proxy/internal/wsbridge"
 )
 
@@ -172,7 +173,7 @@ func (s *MTServer) dialUpstream(
 	dialCtx, cancel := context.WithTimeout(ctx, s.cfg.DialTimeout)
 	defer cancel()
 
-	tcpConn, err := (&net.Dialer{}).DialContext(dialCtx, "tcp", addr)
+	tcpConn, err := (&net.Dialer{Control: sockopts.MarkControl(s.cfg.FWMark)}).DialContext(dialCtx, "tcp", addr)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("upstream dial %s: %w", addr, err)
 	}

@@ -819,6 +819,25 @@ configure_pool_size() {
     done
 }
 
+configure_fw_mark() {
+    show_header
+    printf '%s\n' 'Firewall mark for outbound proxy TCP connections (Linux only)'
+    printf 'Current value: %s\n' "${FW_MARK:-0}"
+    printf '%s\n' 'Enter decimal or 0x hexadecimal; 0 disables. UDP and DNS are unmarked.'
+    printf 'New mark (empty to keep current): '
+    IFS= read -r new_fw_mark
+    [ -n "$new_fw_mark" ] || return 0
+    if ! fw_mark_valid "$new_fw_mark"; then
+        printf '%s\n' 'Mark must be between 0 and 4294967295 (decimal or 0x hexadecimal).'
+        pause
+        return 1
+    fi
+    FW_MARK="$new_fw_mark"
+    write_settings_config || return 1
+    prompt_restart_proxy_for_updated_settings
+    pause
+}
+
 configure_dc_ip_mapping() {
     show_header
     show_dc_ip_mapping_settings
@@ -1545,7 +1564,11 @@ check_mt_upstream_proxies() {
         _cmu_label="${_cmu_host}:${_cmu_port}"
         _cmu_total=$((_cmu_total + 1))
         printf "  %-28s checking...\r" "$_cmu_label"
-        _cmu_line="$("$_cmu_bin" probe-upstream "${_cmu_host}:${_cmu_port}" 2>/dev/null || true)"
+        if [ "${FW_MARK:-0}" != "0" ]; then
+            _cmu_line="$("$_cmu_bin" probe-upstream --fwmark "$FW_MARK" "${_cmu_host}:${_cmu_port}" 2>/dev/null || true)"
+        else
+            _cmu_line="$("$_cmu_bin" probe-upstream "${_cmu_host}:${_cmu_port}" 2>/dev/null || true)"
+        fi
         _cmu_status="$(printf "%s" "$_cmu_line" | cut -d' ' -f2)"
         _cmu_detail="$(printf "%s" "$_cmu_line" | cut -d' ' -f3)"
         case "$_cmu_status" in
@@ -1756,6 +1779,7 @@ advanced_menu() {
         printf " 16) Show QR code\n"
         printf " 17) Update source\n"
         printf " 18) Remove binary\n"
+        printf " 22) Firewall mark (%s, outbound TCP)\n" "${FW_MARK:-0}"
         printf "\n  MTProto\n"
         if [ "$PROXY_MODE" = "mtproto" ]; then
             printf " 19) Mode (%smtproto%s)\n" "$C_GREEN" "$C_RESET"
@@ -1860,6 +1884,9 @@ advanced_menu() {
                 ;;
             21)
                 configure_mt_upstream_proxies
+                ;;
+            22)
+                configure_fw_mark
                 ;;
             *)
                 return 0

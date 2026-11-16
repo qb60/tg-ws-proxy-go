@@ -318,6 +318,9 @@ _run_proxy_cmd() {
     [ -n "$_rpc_bin" ] || return 1
 
     set -- "$_rpc_bin" --host "$LISTEN_HOST" --port "$LISTEN_PORT" --pool-size "$POOL_SIZE"
+    if [ "${FW_MARK:-0}" != "0" ]; then
+        set -- "$@" --fwmark "$FW_MARK"
+    fi
 
     if [ "$PROXY_MODE" = "mtproto" ]; then
         set -- "$@" --mode mtproto --secret "$MT_SECRET"

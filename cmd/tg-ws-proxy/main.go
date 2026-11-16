@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -20,6 +21,7 @@ import (
 	"tg-ws-proxy/internal/config"
 	"tg-ws-proxy/internal/mtpserver"
 	"tg-ws-proxy/internal/release"
+	"tg-ws-proxy/internal/sockopts"
 	"tg-ws-proxy/internal/socks5"
 	"tg-ws-proxy/internal/telegram"
 )
@@ -68,6 +70,17 @@ type parsedArgs struct {
 	linkIP string
 }
 
+func registerFWMarkFlag(fs *flag.FlagSet, mark *uint32) {
+	fs.Func("fwmark", "Linux firewall mark for outbound proxy TCP connections (decimal or 0x hex; 0 disables)", func(value string) error {
+		var err error
+		*mark, err = config.ParseFWMark(value)
+		if err == nil && *mark != 0 && runtime.GOOS != "linux" {
+			return fmt.Errorf("--fwmark is only supported on Linux")
+		}
+		return err
+	})
+}
+
 func parseArgs(args []string) (parsedArgs, error) {
 	cfg := config.Default()
 	var dcIPs dcIPFlags
@@ -76,6 +89,7 @@ func parseArgs(args []string) (parsedArgs, error) {
 	fs := flag.NewFlagSet("tg-ws-proxy", flag.ContinueOnError)
 	fs.StringVar(&cfg.Host, "host", cfg.Host, "listen host")
 	fs.IntVar(&cfg.Port, "port", cfg.Port, "listen port")
+	registerFWMarkFlag(fs, &cfg.FWMark)
 	registerPprofFlag(fs, &cfg)
 	fs.StringVar(&cfg.Username, "username", cfg.Username, "SOCKS5 username auth")
 	fs.StringVar(&cfg.Password, "password", cfg.Password, "SOCKS5 password auth")
@@ -250,6 +264,9 @@ func startupSummary(pa parsedArgs) string {
 	if pa.cfg.PprofAddr != "" {
 		fmt.Fprintf(&b, " pprof_addr=%s", pa.cfg.PprofAddr)
 	}
+	if pa.cfg.FWMark != 0 {
+		fmt.Fprintf(&b, " fwmark=%#x", pa.cfg.FWMark)
+	}
 
 	if pa.mode == "socks5" {
 		authMode := "off"
@@ -316,8 +333,15 @@ func classifyDialErr(err error) string {
 }
 
 func probeUpstream(targets []string) int {
+	var mark uint32
+	fs := flag.NewFlagSet("probe-upstream", flag.ContinueOnError)
+	registerFWMarkFlag(fs, &mark)
+	if err := fs.Parse(targets); err != nil {
+		return 2
+	}
+	targets = fs.Args()
 	if len(targets) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: tg-ws-proxy probe-upstream HOST:PORT [HOST:PORT ...]")
+		fmt.Fprintln(os.Stderr, "usage: tg-ws-proxy probe-upstream [--fwmark MARK] HOST:PORT [HOST:PORT ...]")
 		return 2
 	}
 	const dialTimeout = 5 * time.Second
@@ -330,7 +354,7 @@ func probeUpstream(targets []string) int {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 		start := time.Now()
-		conn, err := new(net.Dialer).DialContext(ctx, "tcp", target)
+		conn, err := (&net.Dialer{Control: sockopts.MarkControl(mark)}).DialContext(ctx, "tcp", target)
 		elapsed := time.Since(start).Round(time.Millisecond)
 		cancel()
 		if err != nil {

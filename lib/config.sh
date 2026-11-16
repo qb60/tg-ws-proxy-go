@@ -99,6 +99,22 @@ normalize_dc_ip_list() {
     '
 }
 
+fw_mark_valid() {
+    FW_MARK_INPUT="$1" awk 'BEGIN {
+        mark = ENVIRON["FW_MARK_INPUT"]
+        if (mark ~ /^0[xX][0-9a-fA-F]+$/) {
+            digits = tolower(substr(mark, 3))
+            value = 0
+            for (i = 1; i <= length(digits); i++) {
+                value = value * 16 + index("0123456789abcdef", substr(digits, i, 1)) - 1
+                if (value > 4294967295) exit 1
+            }
+            exit 0
+        }
+        exit !(mark ~ /^[0-9]+$/ && mark + 0 <= 4294967295)
+    }'
+}
+
 write_settings_config() {
     bin_path="${1:-}"
 
@@ -107,6 +123,10 @@ write_settings_config() {
     fi
 
     auth_settings_valid || return 1
+    if ! fw_mark_valid "${FW_MARK:-0}"; then
+        printf '%s\n' 'Invalid FW_MARK: expected 0..4294967295 or 0x hexadecimal.' >&2
+        return 1
+    fi
 
     mkdir -p "$PERSIST_STATE_DIR" || return 1
     {
@@ -117,6 +137,7 @@ write_settings_config() {
         printf "PORT='%s'\n" "$LISTEN_PORT"
         printf "VERBOSE='%s'\n" "$VERBOSE"
         printf "POOL_SIZE='%s'\n" "$POOL_SIZE"
+        printf "FW_MARK='%s'\n" "${FW_MARK:-0}"
         printf "USERNAME='%s'\n" "$SOCKS_USERNAME"
         printf "PASSWORD='%s'\n" "$SOCKS_PASSWORD"
         printf "DC_IPS='%s'\n" "$DC_IPS"
@@ -152,6 +173,11 @@ load_saved_settings() {
     if [ -z "$POOL_SIZE_FROM_ENV" ]; then
         pool_size_value="$(read_config_value POOL_SIZE 2>/dev/null || true)"
         [ -n "$pool_size_value" ] && POOL_SIZE="$pool_size_value"
+    fi
+
+    if [ -z "$FW_MARK_FROM_ENV" ]; then
+        fw_mark_value="$(read_config_value FW_MARK 2>/dev/null || true)"
+        [ -n "$fw_mark_value" ] && FW_MARK="$fw_mark_value"
     fi
 
     if [ -z "$SOCKS_USERNAME_FROM_ENV" ]; then
